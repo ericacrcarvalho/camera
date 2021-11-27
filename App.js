@@ -1,31 +1,62 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, Image, Modal } from 'react-native';
 import { Camera } from 'expo-camera';
+import * as MediaLibrary from 'expo-media-library';
+import * as Location from 'expo-location';
 
 const App = () => {
 
+  // Camera
   const [typeCamera, setTypeCamera] = useState(Camera.Constants.Type.back);
   const [hasPermission, setHasPermission] = useState(null);
   const cameraRef = useRef(null);
   const [photo, setPhoto] = useState(null);
   const [openModal, setOpenModal] = useState(false);
 
+  // Location
+  const [msg, setMsg] = useState(null);
+  const [location, setLocation] = useState(null);
+
   useEffect(() => {
+    // Camera
     (async () => {
       const { status } = await Camera.requestCameraPermissionsAsync();
       //console.log(status);
       setHasPermission(status === 'granted');
-    })()
+    })();
+
+    // Location
+    (async () => {
+      let { status } = await Location.requestBackgroundPermissionsAsync();
+      if (status !== 'granted') {
+        setMsg("Permissão negada");
+        return;
+      }
+      let loc = await Location.getCurrentPositionAsync({});
+      setLocation(loc);
+    })();
+
   },[]);
 
+  // Exibindo a localização
+  let textLocation = "Buscando...";
+  if (msg) {
+    textLocation = msg;
+  } else if (location) {
+    //console.log(JSON.stringify(location));
+    textLocation = JSON.stringify(location);
+  }
+
+
+  // Permissão da câmera
   if (hasPermission == null) {
     return <View/>
   }
-
   if (hasPermission == false) {
-    return <Text style={{fontSize:30}}>Acesso negado</Text>
+    return <Text style={{fontSize:30}}>Acesso negado!</Text>
   }
 
+  // Tirando uma foto
   const takePhoto = async () => {
     if (cameraRef) {
       let data = await cameraRef.current.takePictureAsync();
@@ -35,10 +66,23 @@ const App = () => {
     }
   }
 
+  // Salvando a foto
+  const savePhoto = async () => {
+    const assets = await MediaLibrary.createAssetAsync(photo)
+    .then(() => {
+      alert("Foto salva com sucesso!")
+    })
+    .catch(error => {
+      alert("Falha ao salvar a foto");
+      console.log("error:", error);
+    })
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.viewText}>
         <Text style={styles.text}>App Camera!</Text>
+        <Text style={{}}>Minha localização: {textLocation}</Text>
       </View>
       <Camera
         style={styles.camera}
@@ -60,6 +104,7 @@ const App = () => {
         >
           <Text style={styles.textButton}>Tirar foto</Text>
         </TouchableOpacity>
+
         { photo && 
           <Modal
             animationType="slide"
@@ -68,18 +113,22 @@ const App = () => {
           >
             <Text>My photo!</Text>
             <Image
-              style={{width: 200, height: 200}}
+              style={{width: 220, height: 500}}
               source={{uri:photo}}
             />
             <TouchableOpacity
-            onPress={() => setOpenModal(false)}
-        >
-            <Text>Voltar</Text>
-        </TouchableOpacity>
+              onPress={() => setOpenModal(false)}
+            >
+              <Text>Voltar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={savePhoto}
+            >
+              <Text>Salvar</Text>
+            </TouchableOpacity>
           </Modal>       
         }    
-      </Camera>
-         
+      </Camera>         
     </View>
   );
 }
@@ -100,8 +149,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',    
   },
   camera: {
-    flex: 1,
+    flex: 0.9,
     margin: 20,
+    marginTop: 40,
   },
   viewButton: {
     flex: 1,
